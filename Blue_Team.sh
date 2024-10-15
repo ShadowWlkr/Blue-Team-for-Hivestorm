@@ -21,6 +21,8 @@ update_system() {
 # Function to manage user accounts and permissions
 manage_users() {
     local user_list=$1
+    local essential_users=("root" "bin" "daemon" "sys" "sync" "games" "man" "lp" "mail" "news" "uucp" "proxy" "www-data" "backup" "list" "irc" "gnats" "nobody" "systemd-timesync" "systemd-network" "systemd-resolve" "systemd-bus-proxy")
+
     echo "Reading user list from $user_list..."
 
     # Check and add users from the provided user list
@@ -34,17 +36,19 @@ manage_users() {
         fi
     done < "$user_list"
 
-    # Remove unauthorized users not in the provided user list
+    # Identify unauthorized users not in the provided user list
     echo "Updating passwords for existing users..."
+    > unauthorized_users.txt
     for user in $(cut -d: -f1 /etc/passwd); do
         if grep -q "^$user$" "$user_list"; then
             echo "$user:CyberBuccaneerRaiders" | sudo chpasswd
             echo "Password for $user set to: CyberBuccaneerRaiders"
-        else
-            echo "Removing unauthorized user: $user"
-            sudo userdel $user
+        elif [[ ! " ${essential_users[@]} " =~ " $user " ]]; then
+            echo "Identifying unauthorized user: $user"
+            echo "$user" >> unauthorized_users.txt
         fi
     done
+
     pause_and_clear
 }
 
@@ -129,26 +133,6 @@ secure_remote_access() {
     pause_and_clear
 }
 
-# Function to enable and centralize logging
-enable_logging() {
-    echo "Enabling and centralizing logging..."
-    # Install rsyslog for centralized logging
-    sudo apt-get install -y rsyslog
-    # Enable and start rsyslog service
-    sudo systemctl enable rsyslog
-    sudo systemctl start rsyslog
-    echo "Logging enabled and centralized"
-    pause_and_clear
-}
-
-# Function to monitor critical system logs
-monitor_logs() {
-    echo "Monitoring critical system logs..."
-    # Tail critical logs for monitoring
-    sudo tail -f /var/log/auth.log /var/log/syslog
-    pause_and_clear
-}
-
 # Function to create secure configuration baselines with Lynis
 secure_baselines() {
     echo "Creating secure configuration baselines..."
@@ -212,8 +196,6 @@ configure_ipv4_ipv6
 configure_ufw
 check_open_ports
 secure_remote_access
-enable_logging
-monitor_logs
 secure_baselines
 install_clamav
 check_malicious_files
